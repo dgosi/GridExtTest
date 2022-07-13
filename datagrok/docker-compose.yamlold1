@@ -1,0 +1,112 @@
+version: "3"
+services:
+  db:
+    image: postgres:12.4
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432/tcp"
+    networks:
+      datagrok:
+        aliases:
+          - database
+    volumes:
+      - datagrok_db:/var/lib/postgresql/data
+    restart: on-failure
+    profiles: [ "all", "db" ]
+
+  datagrok:
+    image: datagrok/datagrok:latest
+    environment:
+      GROK_PARAMETERS: "{
+        \"deployDemo\": false,
+        \"dbServer\": \"database\",
+        \"db\": \"datagrok\",
+        \"dbAdminLogin\": \"postgres\",
+        \"dbAdminPassword\": \"postgres\",
+        \"dbLogin\": \"dg\",
+        \"dbPassword\": \"dg\",
+        \"adminPassword\": \"admin\"
+      }"
+    ports:
+      - "8080:8080/tcp"
+    networks:
+      datagrok:
+        aliases:
+          - datagrok
+    volumes:
+      - datagrok_data:/home/grok/data
+      - datagrok_cfg:/home/grok/cfg
+    restart: unless-stopped
+    profiles: [ "all", "datagrok" ]
+
+  grok_connect:
+    image: datagrok/grok_connect:latest
+    networks:
+      datagrok:
+        aliases:
+          - grok_connect
+    restart: unless-stopped
+    profiles: [ "all", "datagrok", "grok_connect" ]
+
+  grok_compute:
+    image: datagrok/grok_compute:latest
+    environment:
+      GROK_COMPUTE_NUM_CORES: 2
+    networks:
+      datagrok:
+        aliases:
+          - grok_compute
+    restart: unless-stopped
+    profiles: [ "all", "cvm", "chem" ]
+
+  cvm_nginx:
+    image: datagrok/cvm_nginx:latest
+    ports:
+      - "8090:8090/tcp"
+    networks:
+      datagrok:
+        aliases:
+          - cvm
+          - nginx_cvm
+    restart: unless-stopped
+    profiles: [ "all", "cvm", "chem", "jupyter_notebook", "scripting" ]
+
+  jupyter_notebook:
+    image: datagrok/jupyter_notebook:latest
+    networks:
+      datagrok:
+        aliases:
+          - jupyter_notebook
+    restart: unless-stopped
+    profiles: [ "all", "cvm", "jupyter_notebook" ]
+
+  jupyter_kernel_gateway:
+    image: datagrok/jupyter_kernel_gateway:latest
+    networks:
+      datagrok:
+        aliases:
+          - jupyter_kernel_gateway
+    restart: unless-stopped
+    profiles: [ "all", "cvm", "scripting" ]
+
+  h2o:
+    image: datagrok/h2o:latest
+    ports:
+      - "54321:54321/tcp"
+      - "5005:5005/tcp"
+    networks:
+      datagrok:
+        aliases:
+          - h2o
+    restart: unless-stopped
+    profiles: [ "all", "cvm", "modeling" ]
+
+volumes:
+  datagrok_db:
+  datagrok_data:
+  datagrok_cfg:
+
+networks:
+  datagrok:
